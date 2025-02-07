@@ -218,7 +218,9 @@
 
         .suggestions-container {
             position: absolute;
-            width: calc(100% - 48px);
+            top: 100%;
+            left: 0;
+            right: 0;
             background: var(--background-color);
             border: 1px solid var(--border-color);
             border-radius: var(--radius-md);
@@ -573,6 +575,7 @@
                 <div id="suggestions" class="suggestions-container" style="display: none;"></div>
                 <div id="error-message"></div>
             </div>
+            <div id="search-results" class="search-results-container"></div>
             <div class="quick-search">
                 <div class="category-icon" onclick="searchCategory('mall')">
                     <div class="icon-circle">
@@ -748,12 +751,38 @@
 
     <script>
         // Initialize Mapbox with the access token from Flask
-        mapboxgl.accessToken = '{{ mapbox_token }}';
+        const mapboxToken = "{{ mapbox_token }}";
+        mapboxgl.accessToken = mapboxToken;
+        
+        // For testing purposes
+        window.mapboxToken = mapboxToken;
         
         let map;
         let markers = [];
         let currentBoundary;
         let searchTimeout;
+
+        function handleSearchResults(results) {
+            if (results && results.length > 0) {
+                displaySearchResults(results);
+                updateMap(results);
+            } else {
+                displayError("No results found");
+            }
+        }
+
+        function displaySearchResults(results) {
+            const container = document.getElementById('search-results');
+            if (!container) return;
+            
+            container.innerHTML = '';
+            results.forEach(result => {
+                const resultElement = document.createElement('div');
+                resultElement.className = 'search-result';
+                resultElement.textContent = result.name || 'Unnamed location';
+                container.appendChild(resultElement);
+            });
+        }
 
         function initMap() {
             // Initialize the map

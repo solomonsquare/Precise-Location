@@ -35,7 +35,7 @@ def debug_info():
     """Route to verify API key and environment setup"""
     return {
         'mapbox_token_present': bool(MAPBOX_ACCESS_TOKEN),
-        'environment': app.env,
+        'environment': 'development' if app.debug else 'production',
         'debug_mode': app.debug
     }
 

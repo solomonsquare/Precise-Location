@@ -1,6 +1,4 @@
-import pytest
-import json
-import requests_mock
+from app import get_osm_filters
 
 def test_nominatim_search(client, requests_mock, mock_mapbox_token):
     """Test the Nominatim search functionality"""
@@ -23,43 +21,20 @@ def test_nominatim_search(client, requests_mock, mock_mapbox_token):
     response = client.get('/')
     assert b'getLocation' in response.data
 
-def test_overpass_search(client, requests_mock, mock_mapbox_token):
-    """Test the Overpass API search functionality"""
-    mock_response = {
-        'elements': [
-            {
-                'type': 'node',
-                'id': 123456,
-                'lat': 54.9783,
-                'lon': -1.6178,
-                'tags': {
-                    'amenity': 'restaurant',
-                    'name': 'Test Restaurant'
-                }
-            }
-        ]
-    }
-    
-    requests_mock.get(
-        'https://overpass-api.de/api/interpreter',
-        json=mock_response
-    )
-    
+def test_overpass_search_uses_same_origin_proxy(client, mock_mapbox_token):
+    """The browser must not call Overpass directly because that fails CORS."""
     response = client.get('/')
-    assert b'searchPlaces' in response.data
+    page = response.get_data(as_text=True)
 
-def test_amenity_filter_generation(client, mock_mapbox_token):
-    """Test the amenity filter generation for different search terms"""
-    response = client.get('/')
-    assert b'getAmenityFilter' in response.data
-    
-    # Common search terms should be present in the JavaScript code
-    common_terms = [
-        b'restaurant', b'cafe', b'pub',
-        b'supermarket', b'school', b'hospital'
-    ]
-    for term in common_terms:
-        assert term in response.data
+    assert "fetch('/api/overpass'" in page
+    assert 'overpass-api.de/api/interpreter' not in page
+
+def test_amenity_filter_generation():
+    """Category filters are generated and sanitized on the server."""
+    assert get_osm_filters('restaurant') == ['["amenity"="restaurant"]']
+    assert get_osm_filters('pub') == ['["amenity"~"^(bar|pub)$"]']
+    assert get_osm_filters('college') == ['["amenity"="college"]']
+    assert get_osm_filters('square') == ['["place"="square"]']
 
 def test_map_marker_functionality(client, mock_mapbox_token):
     """Test the map marker related functions"""
@@ -78,4 +53,4 @@ def test_error_handling(client, mock_mapbox_token):
     """Test error handling in search functionality"""
     response = client.get('/')
     assert b'catch' in response.data
-    assert b'error-message' in response.data 
+    assert b'error-message' in response.data

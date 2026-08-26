@@ -11,12 +11,13 @@ Precise Location Search is a web application that empowers users to find points 
   - Food courts, train and bus stations, BBQ areas, gardens, and marketplaces
   - Skate parks (with enhanced filtering for `leisure=skate_park`, `sport=skateboard`, and `sport=skating`)
   - Playgrounds and sports centers
-- **Responsive UI**: Built with a modern React frontend and a Flask backend for a seamless user experience.
+- **Responsive UI**: Built with a responsive HTML/JavaScript frontend and a Flask backend.
+- **Production-safe OSM access**: Browser requests use a validated same-origin Flask endpoint instead of calling Overpass directly.
 - **No Hardcoded Locations**: All locations and boundaries are dynamically determined via user input and external APIs, with no static defaults.
 
 ## Technologies Used
 
-- **Frontend**: ReactJS with Mapbox for map rendering
+- **Frontend**: HTML/JavaScript with Mapbox for map rendering
 - **Backend**: Python Flask
 - **Location Services**: OpenStreetMap Overpass API for location data, Nominatim for geocoding
 - **Utilities**: Custom JavaScript functions for boundary calculations and coordinate validation
@@ -34,8 +35,8 @@ Precise Location Search is a web application that empowers users to find points 
 1. **Clone the Repository**
 
    ```bash
-   git clone <repository-url>
-   cd Precise-Search-V0
+   git clone https://github.com/solomonsquare/Precise-Location.git
+   cd Precise-Location
    ```
 
 2. **Install Backend Dependencies**
@@ -55,7 +56,7 @@ Precise Location Search is a web application that empowers users to find points 
 4. **Run the Application**
 
    ```bash
-   python app.py (or python3 app.py)
+   python app.py
    ```
 
 5. **Access the Application**
@@ -63,7 +64,7 @@ Precise Location Search is a web application that empowers users to find points 
    Open your browser and navigate to:
    
    ```
-   http://localhost:5000
+   http://localhost:5002
    ```
 
 ## Usage
@@ -83,8 +84,17 @@ Precise Location Search is a web application that empowers users to find points 
 
 ## Notes
 
-- The application relies on live data from OpenStreetMap via the Overpass API. Ensure your network permits connections to these endpoints.
+- The browser sends structured place and geometry lookups to `/api/overpass`. Flask validates the search term and map boundary, builds a bounded query, and calls Overpass server-side. This avoids production CORS failures and prevents the endpoint from becoming an unrestricted query proxy.
+- `OVERPASS_API_URL` can optionally point to a compatible self-hosted Overpass interpreter. Consider this before the app grows beyond light use of the public service.
+- The production start command is `gunicorn app:app`. The included Gunicorn configuration uses threaded workers, limits simultaneous outbound OSM calls, and keeps the application timeout above the upstream timeout.
+- Configure Render to use `/healthz` for readiness. It returns `503` when the required `MAPBOX_ACCESS_TOKEN` is missing, preventing a broken deployment from being marked ready.
 - There are no hardcoded default locations or boundaries; all data is fetched dynamically based on user input and external API responses.
+
+## Tests
+
+```bash
+python -m pytest -q
+```
 
 ## Contributing
 
@@ -92,4 +102,4 @@ Contributions are welcome! Please open an issue or submit a pull request for imp
 
 ## License
 
-[MIT License](LICENSE) 
+[MIT License](LICENSE)

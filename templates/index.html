@@ -948,6 +948,30 @@
             return data;
         }
 
+        async function fetchOverpass(payload) {
+            const response = await fetch('/api/overpass', {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+
+            let data;
+            try {
+                data = await response.json();
+            } catch (error) {
+                throw new Error('OSM returned an invalid response. Please try again.');
+            }
+
+            if (!response.ok) {
+                throw new Error(data.error || 'OSM search failed. Please try again.');
+            }
+
+            return data;
+        }
+
         function displaySuggestions(suggestions, originalQuery) {
             const container = document.getElementById('suggestions');
             container.innerHTML = '';
@@ -1333,7 +1357,7 @@
                             }
                         } catch (error) {
                             console.error('Error in boundary addition or search:', error);
-                            showError('Failed to complete the search. Please try again.');
+                            showError(error.message || 'Failed to complete the search. Please try again.');
                         }
                     };
 
@@ -1408,51 +1432,19 @@
                     // If no polygon, try to get boundary from Overpass API
                     if (location.osm_type && location.osm_id) {
                         try {
-                            // First try to get the relation for the area
-                            let overpassQuery = `[out:json][timeout:25];
-                                area[name="${location.name}"][admin_level][boundary=administrative];
-                                out geom;`;
-
-                            let overpassResponse = await fetch('https://overpass-api.de/api/interpreter', {
-                                method: 'POST',
-                                body: `data=${encodeURIComponent(overpassQuery)}`
+                            const osmData = await fetchOverpass({
+                                type: 'geometry',
+                                osmType: location.osm_type,
+                                osmId: location.osm_id
                             });
-
-                            if (overpassResponse.ok) {
-                                const osmData = await overpassResponse.json();
-                                if (osmData.elements && osmData.elements.length > 0) {
-                                    const element = osmData.elements[0];
-                                    if (element.geometry) {
-                                        location.geojson = {
-                                            type: 'Polygon',
-                                            coordinates: [element.geometry.map(point => [point.lon, point.lat])]
-                                        };
-                                        return location;
-                                    }
-                                }
-                            }
-
-                            // If no administrative boundary found, try direct object geometry
-                            overpassQuery = `[out:json][timeout:25];
-                                ${location.osm_type}(${location.osm_id});
-                                out geom;`;
-
-                            overpassResponse = await fetch('https://overpass-api.de/api/interpreter', {
-                                method: 'POST',
-                                body: `data=${encodeURIComponent(overpassQuery)}`
-                            });
-
-                            if (overpassResponse.ok) {
-                                const osmData = await overpassResponse.json();
-                                if (osmData.elements && osmData.elements.length > 0) {
-                                    const element = osmData.elements[0];
-                                    if (element.geometry) {
-                                        location.geojson = {
-                                            type: 'Polygon',
-                                            coordinates: [element.geometry.map(point => [point.lon, point.lat])]
-                                        };
-                                        return location;
-                                    }
+                            if (osmData.elements && osmData.elements.length > 0) {
+                                const element = osmData.elements[0];
+                                if (element.geometry) {
+                                    location.geojson = {
+                                        type: 'Polygon',
+                                        coordinates: [element.geometry.map(point => [point.lon, point.lat])]
+                                    };
+                                    return location;
                                 }
                             }
                         } catch (error) {
@@ -1473,147 +1465,14 @@
             }
         }
 
-        function getAmenityFilter(searchTerm) {
-            if (!searchTerm) return '["shop"~"mall|department_store"]';
-            
-            const term = searchTerm.toLowerCase();
-            
-            // Exact matching for specific place types
-            if (term.includes('train station') || term === 'train_station') {
-                return '["railway"="station"]';
-            }
-            if (term.includes('bus station') || term === 'bus_station') {
-                return '["amenity"="bus_station"]';
-            }
-            if (term.includes('bbq') || term.includes('barbecue') || term.includes('barbeque')) {
-                return '["amenity"="bbq"]';
-            }
-            if (term.includes('garden')) {
-                return '["garden:type"="botanical"]';
-            }
-            if (term.includes('marketplace') || term === 'market') {
-                return '["amenity"="marketplace"]';
-            }
-            if (term.includes('skate') || term === 'skateboard_pitch') {
-                return '["leisure"="pitch"]["sport"="skateboard"]';
-            }
-            if (term.includes('playground')) {
-                return '["leisure"="playground"]';
-            }
-            if (term.includes('sports') || term === 'sports_centre') {
-                return '["leisure"="sports_centre"]';
-            }
-            if (term.includes('shopping mall') || term.includes('mall')) {
-                return '["shop"~"mall|department_store"]';
-            }
-            if (term.includes('supermarket')) {
-                return '["shop"="supermarket"]';
-            }
-            if (term.includes('restaurant')) {
-                return '["amenity"="restaurant"]';
-            }
-            if (term.includes('cafe')) {
-                return '["amenity"="cafe"]';
-            }
-            if (term.includes('bar') || term.includes('pub')) {
-                return '["amenity"~"^(bar|pub)$"]';
-            }
-            if (term.includes('hotel')) {
-                return '["tourism"="hotel"]';
-            }
-            if (term.includes('night') || term.includes('club') || term.includes('nightclub')) {
-                return '["amenity"="nightclub"]';
-            }
-            if (term.includes('school')) {
-                return '["amenity"="school"]';
-            }
-            if (term.includes('university')) {
-                return '["amenity"="university"]';
-            }
-            if (term.includes('hospital')) {
-                return '["amenity"="hospital"]';
-            }
-            if (term.includes('pharmacy')) {
-                return '["amenity"="pharmacy"]';
-            }
-            if (term.includes('bank')) {
-                return '["amenity"="bank"]';
-            }
-            if (term.includes('post office')) {
-                return '["amenity"="post_office"]';
-            }
-            if (term.includes('police')) {
-                return '["amenity"="police"]';
-            }
-            if (term.includes('library')) {
-                return '["amenity"="library"]';
-            }
-            if (term.includes('park')) {
-                return '["leisure"="park"]';
-            }
-            if (term.includes('gym')) {
-                return '["leisure"="fitness_centre"]';
-            }
-            if (term.includes('cinema') || term.includes('movie')) {
-                return '["amenity"="cinema"]';
-            }
-            if (term.includes('gas') || term.includes('petrol') || term === 'fuel' || term === 'petrol_station') {
-                return '["amenity"~"^(fuel|charging_station)$"]';
-            }
-            if (term.includes('parking')) {
-                return '["amenity"="parking"]';
-            }
-            if (term.includes('airport')) {
-                return '["aeroway"="aerodrome"]';
-            }
-            if (term.includes('beach')) {
-                return '["natural"="beach"]';
-            }
-            if (term.includes('picnic') || term === 'picnic_site') {
-                return '["tourism"="picnic_site"]';
-            }
-            if (term.includes('square') || term === 'square') {
-                return '["place"="square"]';
-            }
-            if (term.includes('college') || term === 'college') {
-                return '["amenity"="college"]';
-            }
-
-            // If no exact match, try to match the term exactly against tags
-            const cleanTerm = term.replace(/s\b/g, '').replace(/\s+/g, '_');
-            return `["amenity"="${cleanTerm}"]|["shop"="${cleanTerm}"]|["tourism"="${cleanTerm}"]|["leisure"="${cleanTerm}"]`;
-        }
 
         async function searchPlaces(searchTerm, center, boundingBox, areaId) {
-            let amenityFilter = getAmenityFilter(searchTerm);
-            
-            // Ensure we have valid coordinates for the bounding box
-            const south = Math.min(boundingBox[0][1], boundingBox[1][1]);
-            const west = Math.min(boundingBox[0][0], boundingBox[1][0]);
-            const north = Math.max(boundingBox[0][1], boundingBox[1][1]);
-            const east = Math.max(boundingBox[0][0], boundingBox[1][0]);
-            
-            // Create a search query that works for any area
-            const query = `[out:json][timeout:30];
-                (
-                    way${amenityFilter}(${south},${west},${north},${east});
-                    node${amenityFilter}(${south},${west},${north},${east});
-                );
-                out body center qt;
-                >;
-                out skel qt;`;
-
             try {
-                const response = await fetch('https://overpass-api.de/api/interpreter', {
-                    method: 'POST',
-                    body: `data=${encodeURIComponent(query)}`
+                const data = await fetchOverpass({
+                    type: 'places',
+                    searchTerm,
+                    boundingBox
                 });
-                
-                if (!response.ok) {
-                    throw new Error('Could not fetch this tag in OSM');
-                }
-
-                const data = await response.json();
                 
                 // Check if data is empty or undefined
                 if (!data || !data.elements || data.elements.length === 0) {
@@ -1658,10 +1517,6 @@
                 return filteredResults;
             } catch (error) {
                 console.error('Overpass API error:', error);
-                // Pass through our custom error messages, but standardize fetch errors
-                if (error.message.includes('Failed to fetch')) {
-                    throw new Error('Could not fetch this tag in OSM');
-                }
                 throw error;
             }
         }
@@ -2006,4 +1861,4 @@
         });
     </script>
 </body>
-</html> 
+</html>

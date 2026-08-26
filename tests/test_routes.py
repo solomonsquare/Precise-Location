@@ -34,4 +34,18 @@ def test_favicon_route(client):
     """Test the favicon route"""
     response = client.get('/favicon.ico')
     assert response.status_code == 200
-    assert response.mimetype == 'image/vnd.microsoft.icon' 
+    assert response.mimetype == 'image/vnd.microsoft.icon'
+
+
+def test_healthcheck_reports_missing_required_configuration(client):
+    response = client.get('/healthz')
+
+    assert response.status_code == 503
+    assert response.get_json()['status'] == 'not ready'
+
+
+def test_healthcheck_is_ready_with_mapbox_token(client, mock_mapbox_token):
+    response = client.get('/healthz')
+
+    assert response.status_code == 200
+    assert response.get_json() == {'status': 'ok'}
